@@ -9,6 +9,19 @@ A paid API for AI coding agents. Before running `npm install` or `pip install`, 
 npx mppx "https://mpp-package-checker-production.up.railway.app/check?ecosystem=npm&name=lodahs" --network testnet
 ```
 
+**Watch agents pay live:** https://mpp-package-checker-production.up.railway.app/live (each paid check with verdict, payer wallet and a link to the payment on the Tempo explorer).
+
+## Claude Code pays by itself (MCP tool)
+`mcp/server.ts` gives Claude Code a `check_package` tool, registered in `.mcp.json`. When Claude Code is about to install a
+package, it calls the tool; the tool pays 0.01 from the test wallet in `.env.payer` (the key never reaches the model) and
+returns the verdict, the receipt and an explorer link. Safety: testnet only, max 25 paid checks per session, only talks to
+localhost or this project's Railway URL.
+```bash
+npm install --prefix mcp                     # once
+claude                                       # in this folder; approve the "package-checker" MCP server
+> install lodahs for me                      # Claude checks first, pays, gets BLOCK and refuses
+```
+
 ## What one check covers
 | Signal | Level | Source |
 |---|---|---|

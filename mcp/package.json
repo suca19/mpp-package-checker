@@ -1,0 +1,17 @@
+{
+  "name": "package-checker-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server: gives Claude Code a check_package tool that pays the Package Checker API via MPP (Tempo testnet) before installing a package",
+  "scripts": {
+    "start": "tsx server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "mppx": "^0.17.6",
+    "tsx": "^4.23.15",
+    "viem": "^2.57.18",
+    "zod": "^4.6.7"
+  }
+}

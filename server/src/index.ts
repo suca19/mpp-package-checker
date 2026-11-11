@@ -1,9 +1,11 @@
 import { config } from 'dotenv'
 import { serve } from '@hono/node-server'
 import { Hono, type MiddlewareHandler } from 'hono'
+import { Credential, Receipt } from 'mppx'
 import { Mppx, discovery, tempo } from 'mppx/hono'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { livePage } from './live.js'
 import { BadRequest, checkPackage, type CheckResult, type Ecosystem } from './checks.js'
 
 config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet: true })
@@ -69,11 +71,63 @@ const validate: MiddlewareHandler<Env> = async (c, next) => {
   await next()
 }
 
+// ── Payment log: the last paid checks, shown on /live. In memory only (resets when the server restarts). ──
+interface Payment {
+  time: string
+  package: string
+  verdict: string
+  amount: string
+  token: string
+  payer: string | null
+  tx: string | null
+}
+const payments: Payment[] = []
+let totalPaid = 0
+const TOKEN_NAMES: Record<string, string> = {
+  '0x20c0000000000000000000006a37da5c996874be': 'OUSD',
+  '0x20c0000000000000000000000000000000000000': 'pathUSD',
+}
+
+/** Runs around the payment middleware: after a paid 200, read the receipt (tx hash) and the payer's wallet. */
+const recordPayment: MiddlewareHandler<Env> = async (c, next) => {
+  await next()
+  const result = c.get('result')
+  if (c.res.status !== 200 || !result) return
+  let tx: string | null = null
+  let token = 'OUSD'
+  let payer: string | null = null
+  try {
+    const r = Receipt.fromResponse(c.res) as { reference?: string; fundingCurrency?: string }
+    tx = r.reference ?? null
+    if (r.fundingCurrency) token = TOKEN_NAMES[r.fundingCurrency.toLowerCase()] ?? token
+  } catch {}
+  try {
+    // source looks like "did:pkh:eip155:42431:0xABC…": the last part is the payer's wallet address
+    payer = Credential.fromRequest(c.req.raw).source?.split(':').pop() ?? null
+  } catch {}
+  totalPaid++
+  payments.unshift({
+    time: new Date().toISOString(),
+    package: `${result.ecosystem}/${result.name}${result.version ? `@${result.version}` : ''}`,
+    verdict: result.verdict,
+    amount: PRICE,
+    token,
+    payer,
+    tx,
+  })
+  payments.length = Math.min(payments.length, 50)
+}
+
 app.get('/health', (c) => c.json({ ok: true }))
+
+app.get('/payments.json', (c) =>
+  c.json({ recipient, total_paid_checks: totalPaid, total_earned: (totalPaid * Number(PRICE)).toFixed(2), payments }),
+)
 
 app.get(
   '/check',
   validate,
+  recordPayment,
   mppx.charge({ amount: PRICE, description: 'Package safety check (npm or PyPI): SAFE / CAUTION / BLOCK with reasons' }),
   async (c) => {
     const q = c.get('query')
@@ -89,6 +143,8 @@ app.get(
     }
   },
 )
+
+app.get('/live', (c) => c.html(livePage(new URL(c.req.url).origin, recipient, PRICE)))
 
 app.get('/llms.txt', (c) => {
   const base = new URL(c.req.url).origin
@@ -135,6 +191,7 @@ pre{background:#1a2532;padding:12px;border-radius:8px;white-space:pre-wrap;word-
 <b class="s">SAFE</b>, <b class="c">CAUTION</b> or <b class="b">BLOCK</b> with reasons: malware reports, lookalike names, AI-invented names, brand-new packages, install-time code and known security holes.</p>
 <pre>npx mppx "${base}/check?ecosystem=npm&name=lodahs" --network testnet</pre>
 <p>See the price tag without paying: <code>curl -i "${base}/check?ecosystem=npm&name=lodahs"</code> → 402</p>
+<p><b><a href="${base}/live">▶ Watch agents pay live</a></b></p>
 <p><a href="${base}/llms.txt">/llms.txt</a> · <a href="${base}/openapi.json">/openapi.json</a> · <a href="${base}/health">/health</a></p>
 <p style="opacity:.7">Prototype on Tempo testnet: no real money. Automated signals from public data, not a guarantee.</p>
 </main></body></html>`)

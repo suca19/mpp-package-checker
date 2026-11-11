@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "package-checker": {
+      "type": "stdio",
+      "command": "mcp/node_modules/.bin/tsx",
+      "args": ["mcp/server.ts"],
+      "env": {
+        "PKG_API_URL": "https://mpp-package-checker-production.up.railway.app",
+        "PKG_MAX_PAID_CALLS": "25"
+      }
+    }
+  }
+}
