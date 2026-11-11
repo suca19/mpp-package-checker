@@ -3,6 +3,12 @@
 A paid API for AI coding agents. Before running `npm install` or `pip install`, the agent pays **0.01** over the
 [Machine Payments Protocol](https://mpp.dev) (HTTP 402, Tempo testnet) and gets **SAFE / CAUTION / BLOCK** with reasons.
 
+**Live:** https://mpp-package-checker-production.up.railway.app (Railway, Tempo testnet)
+
+```bash
+npx mppx "https://mpp-package-checker-production.up.railway.app/check?ecosystem=npm&name=lodahs" --network testnet
+```
+
 ## What one check covers
 | Signal | Level | Source |
 |---|---|---|
@@ -35,7 +41,7 @@ npx mppx validate http://localhost:3000 --query ecosystem=npm --query name=lodas
 | `npm/lodash@4.17.15` | CAUTION | 5 known security holes in that version |
 | `pypi/requests`, `npm/lodash` | SAFE | no red flags |
 
-Verified 2026-11-11: paid flow on Tempo testnet works (402 → pay → 200 + `Payment-Receipt`), `mppx validate` 29 passed / 0 failed.
+Verified 2026-11-11: paid flow on Tempo testnet works (402 → pay → 200 + `Payment-Receipt`), `mppx validate` 29 passed / 0 failed, both locally and on the live Railway URL.
 
 ## Limits
 Prototype on testnet (no real money). The popular-package list for lookalike detection is hand-picked (~100 per ecosystem).
