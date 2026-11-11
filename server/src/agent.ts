@@ -32,7 +32,8 @@ export type AgentEvent =
   | { type: 'done'; checks: number; spent: string }
 
 function loadAgentAccount(): PrivateKeyAccount | null {
-  let key = process.env.AGENT_PRIVATE_KEY
+  // Same key as MPPX_PRIVATE_KEY in .env.payer; either variable name works on the host.
+  let key = process.env.AGENT_PRIVATE_KEY ?? process.env.MPPX_PRIVATE_KEY
   if (!key) {
     try {
       const text = readFileSync(fileURLToPath(new URL('../../.env.payer', import.meta.url)), 'utf8')

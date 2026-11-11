@@ -18,7 +18,7 @@ and one **payment receipt** per check (amount, from/to wallets, transaction link
 process slide by slide between four actors (You · Gemini agent · Package Checker · Tempo blockchain): ① visit → ② 402 price
 tag → signs → ③ retry with payment → ④ payment confirmed on-chain → check runs → ⑤ 200 + verdict → answer. Paid checks also appear on `/live`,
 labelled "Gemini agent". Limits: 5 paid checks per request, 4 runs/minute per visitor, 60 runs/hour overall.
-Needs `GEMINI_API_KEY` and the agent wallet (`AGENT_PRIVATE_KEY`, or `MPPX_PRIVATE_KEY` in `.env.payer` locally).
+Needs `GEMINI_API_KEY` and the agent wallet key as `AGENT_PRIVATE_KEY` or `MPPX_PRIVATE_KEY` (locally read from `.env.payer`).
 
 Tested 2026-11-11 (locally): lodahs → BLOCK; huggingface-cli → BLOCK, suggests huggingface_hub; reqeusts → BLOCK, then Gemini
 paid for a second check of requests → SAFE; express + dotenv → SAFE, SAFE. About 5 s per request.
