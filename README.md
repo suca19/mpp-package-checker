@@ -11,6 +11,17 @@ npx mppx "https://mpp-package-checker-production.up.railway.app/check?ecosystem=
 
 **Watch agents pay live:** https://mpp-package-checker-production.up.railway.app/live (each paid check with verdict, payer wallet and a link to the payment on the Tempo explorer).
 
+## Watch a Gemini agent pay (`/agent`)
+Type a request ("pip install reqeusts please"). A Gemini coding agent (`server/src/agent.ts`, function calling) decides which
+packages to check and pays `/check` with its own testnet wallet before recommending anything. The page draws each message
+between three lanes, Gemini agent · Package Checker · Tempo blockchain: ① visit → ② 402 price tag → ③ signed payment →
+④ payment confirmed on-chain (explorer link) → ⑤ 200 + verdict → Gemini's answer. Paid checks also appear on `/live`,
+labelled "Gemini agent". Limits: 5 paid checks per request, 4 runs/minute per visitor, 60 runs/hour overall.
+Needs `GEMINI_API_KEY` and the agent wallet (`AGENT_PRIVATE_KEY`, or `MPPX_PRIVATE_KEY` in `.env.payer` locally).
+
+Tested 2026-11-11 (locally): lodahs → BLOCK; huggingface-cli → BLOCK, suggests huggingface_hub; reqeusts → BLOCK, then Gemini
+paid for a second check of requests → SAFE; express + dotenv → SAFE, SAFE. About 5 s per request.
+
 ## Claude Code pays by itself (MCP tool)
 `mcp/server.ts` gives Claude Code a `check_package` tool, registered in `.mcp.json`. When Claude Code is about to install a
 package, it calls the tool; the tool pays 0.01 from the test wallet in `.env.payer` (the key never reaches the model) and

@@ -6,6 +6,9 @@ import { Mppx, discovery, tempo } from 'mppx/hono'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { livePage } from './live.js'
+import { agentPage } from './agent-page.js'
+import { agentAvailable, agentWallet, runAgent } from './agent.js'
+import { streamSSE } from 'hono/streaming'
 import { BadRequest, checkPackage, type CheckResult, type Ecosystem } from './checks.js'
 
 config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet: true })
@@ -79,6 +82,7 @@ interface Payment {
   amount: string
   token: string
   payer: string | null
+  agent: string | null
   tx: string | null
 }
 const payments: Payment[] = []
@@ -105,6 +109,8 @@ const recordPayment: MiddlewareHandler<Env> = async (c, next) => {
     // source looks like "did:pkh:eip155:42431:0xABC…": the last part is the payer's wallet address
     payer = Credential.fromRequest(c.req.raw).source?.split(':').pop() ?? null
   } catch {}
+  // Optional self-declared agent name (e.g. "Gemini agent"); only letters, digits, spaces, dashes.
+  const agent = (c.req.header('x-agent-name') ?? '').replace(/[^\w -]/g, '').slice(0, 30) || null
   totalPaid++
   payments.unshift({
     time: new Date().toISOString(),
@@ -113,6 +119,7 @@ const recordPayment: MiddlewareHandler<Env> = async (c, next) => {
     amount: PRICE,
     token,
     payer,
+    agent,
     tx,
   })
   payments.length = Math.min(payments.length, 50)
@@ -143,6 +150,41 @@ app.get(
     }
   },
 )
+
+// ── Gemini agent demo: Gemini decides which packages to check and pays /check with its own testnet wallet. ──
+// Rate limits protect the Gemini free tier and the test wallet: 4 runs per minute per visitor, 60 per hour overall.
+const hits = new Map<string, number[]>()
+let hourly: number[] = []
+function allowRun(ip: string): boolean {
+  const now = Date.now()
+  const mine = (hits.get(ip) ?? []).filter((t) => now - t < 60_000)
+  hourly = hourly.filter((t) => now - t < 3_600_000)
+  if (mine.length >= 4 || hourly.length >= 60) return false
+  mine.push(now)
+  hourly.push(now)
+  hits.set(ip, mine)
+  return true
+}
+
+app.get('/agent', (c) => c.html(agentPage(PRICE, recipient, agentWallet(), agentAvailable())))
+
+app.get('/api/agent', (c) => {
+  const prompt = (c.req.query('prompt') ?? '').trim().slice(0, 400)
+  if (!prompt) return c.json({ error: 'prompt is required' }, 400)
+  if (!agentAvailable()) return c.json({ error: 'The Gemini agent is not configured on this server.' }, 503)
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local'
+  if (!allowRun(ip)) return c.json({ error: 'Too many agent runs. Please wait a minute.' }, 429)
+  // The agent pays this same server over loopback, exactly like an outside agent would over the internet.
+  const selfUrl = `http://127.0.0.1:${port}`
+  return streamSSE(c, async (stream) => {
+    // Write events in order and wait for the last one before the stream closes.
+    let writes: Promise<unknown> = Promise.resolve()
+    await runAgent(prompt, selfUrl, (e) => {
+      writes = writes.then(() => stream.writeSSE({ data: JSON.stringify(e) }))
+    })
+    await writes
+  })
+})
 
 app.get('/live', (c) => c.html(livePage(new URL(c.req.url).origin, recipient, PRICE)))
 
@@ -191,7 +233,7 @@ pre{background:#1a2532;padding:12px;border-radius:8px;white-space:pre-wrap;word-
 <b class="s">SAFE</b>, <b class="c">CAUTION</b> or <b class="b">BLOCK</b> with reasons: malware reports, lookalike names, AI-invented names, brand-new packages, install-time code and known security holes.</p>
 <pre>npx mppx "${base}/check?ecosystem=npm&name=lodahs" --network testnet</pre>
 <p>See the price tag without paying: <code>curl -i "${base}/check?ecosystem=npm&name=lodahs"</code> → 402</p>
-<p><b><a href="${base}/live">▶ Watch agents pay live</a></b></p>
+<p><b><a href="${base}/agent">🤖 Watch a Gemini agent pay for checks</a></b> · <b><a href="${base}/live">▶ All payments, live</a></b></p>
 <p><a href="${base}/llms.txt">/llms.txt</a> · <a href="${base}/openapi.json">/openapi.json</a> · <a href="${base}/health">/health</a></p>
 <p style="opacity:.7">Prototype on Tempo testnet: no real money. Automated signals from public data, not a guarantee.</p>
 </main></body></html>`)

@@ -56,7 +56,7 @@ async function tick(){
       const t=new Date(p.time).toLocaleTimeString();
       return '<div class="row'+(isNew?' new':'')+'"><div class="badge '+esc(p.verdict)+'">'+esc(p.verdict)+'</div>'+
         '<div class="pkg">'+esc(p.package)+'</div><div class="amt">'+esc(p.amount)+' '+esc(p.token)+'</div>'+
-        '<div class="meta">'+t+' · paid by agent wallet '+(p.payer?'<a target="_blank" rel="noopener" href="'+EXP+'address/'+esc(p.payer)+'"><code>'+esc(short(p.payer))+'</code></a>':'unknown')+
+        '<div class="meta">'+t+' · paid by '+(p.agent?'<b>'+esc(p.agent)+'</b> ':'agent ')+'wallet '+(p.payer?'<a target="_blank" rel="noopener" href="'+EXP+'address/'+esc(p.payer)+'"><code>'+esc(short(p.payer))+'</code></a>':'unknown')+
         (p.tx?' · <a target="_blank" rel="noopener" href="'+EXP+'tx/'+esc(p.tx)+'">see payment on the blockchain ↗</a>':'')+'</div></div>';
     }).join('');
     seen=d.payments.map(p=>p.tx||p.time);
