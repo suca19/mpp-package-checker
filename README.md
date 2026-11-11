@@ -13,9 +13,10 @@ npx mppx "https://mpp-package-checker-production.up.railway.app/check?ecosystem=
 
 ## Watch a Gemini agent pay (`/agent`)
 Type a request ("pip install reqeusts please"). A Gemini coding agent (`server/src/agent.ts`, function calling) decides which
-packages to check and pays `/check` with its own testnet wallet before recommending anything. The page draws each message
-between three lanes, Gemini agent · Package Checker · Tempo blockchain: ① visit → ② 402 price tag → ③ signed payment →
-④ payment confirmed on-chain (explorer link) → ⑤ 200 + verdict → Gemini's answer. Paid checks also appear on `/live`,
+packages to check and pays `/check` with its own testnet wallet before recommending anything. The page shows Gemini's answer
+and one **payment receipt** per check (amount, from/to wallets, transaction link). **▶ Show how it was done** replays the
+process slide by slide between four actors (You · Gemini agent · Package Checker · Tempo blockchain): ① visit → ② 402 price
+tag → signs → ③ retry with payment → ④ payment confirmed on-chain → check runs → ⑤ 200 + verdict → answer. Paid checks also appear on `/live`,
 labelled "Gemini agent". Limits: 5 paid checks per request, 4 runs/minute per visitor, 60 runs/hour overall.
 Needs `GEMINI_API_KEY` and the agent wallet (`AGENT_PRIVATE_KEY`, or `MPPX_PRIVATE_KEY` in `.env.payer` locally).
 

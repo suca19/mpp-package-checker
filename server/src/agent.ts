@@ -96,7 +96,11 @@ async function gemini(model: string, contents: Content[]): Promise<Content> {
   }
   const body = (await res.json()) as { candidates?: { content?: Content }[] }
   const content = body.candidates?.[0]?.content
-  if (!content?.parts) throw new Error('Gemini returned no answer')
+  if (!content?.parts?.length) {
+    const err = new Error('Gemini returned no answer') as Error & { status?: number }
+    err.status = 204 // empty reply: worth one retry
+    throw err
+  }
   return { role: 'model', parts: content.parts }
 }
 
@@ -160,7 +164,10 @@ export async function runAgent(prompt: string, selfUrl: string, emit: (e: AgentE
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }]
   const checked = new Set<string>()
+  const verdicts: { name: string; verdict: string; summary: string }[] = []
   let checks = 0
+  let answered = false
+  let retried = false
 
   for (let turn = 1; turn <= MAX_TURNS; turn++) {
     emit({ type: 'thinking', turn })
@@ -168,8 +175,9 @@ export async function runAgent(prompt: string, selfUrl: string, emit: (e: AgentE
     try {
       reply = await gemini(model, contents)
     } catch (err) {
-      // Quota hit (429) or Gemini overloaded (500/503): fall back to the lighter model once.
-      if ([429, 500, 503].includes((err as { status?: number }).status ?? 0) && model !== 'gemini-2.5-flash-lite') {
+      // Empty reply, quota hit (429) or Gemini overloaded (500/503): retry once with the lighter model.
+      if ([204, 429, 500, 503].includes((err as { status?: number }).status ?? 0) && !retried) {
+        retried = true
         model = 'gemini-2.5-flash-lite'
         turn--
         continue
@@ -182,7 +190,10 @@ export async function runAgent(prompt: string, selfUrl: string, emit: (e: AgentE
     const calls = reply.parts.filter((p) => p.functionCall?.name === 'check_package')
     if (calls.length === 0) {
       const text = reply.parts.filter((p) => p.text && !p.thought).map((p) => p.text).join('').trim()
-      emit({ type: 'answer', text: text || '(no answer)' })
+      if (text) {
+        emit({ type: 'answer', text })
+        answered = true
+      }
       break
     }
 
@@ -204,6 +215,7 @@ export async function runAgent(prompt: string, selfUrl: string, emit: (e: AgentE
         emit({ type: 'tool_call', ...args })
         try {
           result = await payForCheck(selfUrl, args, emit)
+          if (result.verdict) verdicts.push({ name: args.name, verdict: String(result.verdict), summary: String(result.summary) })
         } catch (err) {
           const error = `payment or check failed: ${(err as Error).message}`
           emit({ type: 'check_failed', name: args.name, error })
@@ -214,6 +226,13 @@ export async function runAgent(prompt: string, selfUrl: string, emit: (e: AgentE
     }
     contents.push({ role: 'user', parts: responses })
     if (turn === MAX_TURNS) emit({ type: 'error', message: 'The agent took too many steps and was stopped.' })
+  }
+  // If Gemini never wrote a final answer, answer from the paid verdicts so the user is never left with nothing.
+  if (!answered && verdicts.length > 0) {
+    const lines = verdicts.map((v) =>
+      v.verdict === 'BLOCK' ? `Do not install ${v.name}. ${v.summary}` : v.verdict === 'CAUTION' ? `Be careful with ${v.name}. ${v.summary}` : `${v.name} looks safe to install.`,
+    )
+    emit({ type: 'answer', text: `${lines.join('\n')}\n(Summary written from the paid checks: Gemini did not reply.)` })
   }
   emit({ type: 'done', checks, spent: (checks * 0.01).toFixed(2) })
 }

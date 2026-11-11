@@ -126,6 +126,7 @@ const recordPayment: MiddlewareHandler<Env> = async (c, next) => {
 }
 
 app.get('/health', (c) => c.json({ ok: true }))
+app.get('/favicon.ico', (c) => c.body(null, 204))
 
 app.get('/payments.json', (c) =>
   c.json({ recipient, total_paid_checks: totalPaid, total_earned: (totalPaid * Number(PRICE)).toFixed(2), payments }),
