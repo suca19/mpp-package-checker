@@ -1,0 +1,13 @@
+{
+  "name": "package-checker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paid API that AI coding agents call via MPP (HTTP 402) before installing an npm or PyPI package",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "npm ci --prefix server --include=dev",
+    "start": "npm run start --prefix server",
+    "dev": "npm run dev --prefix server"
+  }
+}
